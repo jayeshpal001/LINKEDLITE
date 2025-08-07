@@ -14,6 +14,7 @@ const userRoutes = require('./routes/userRoutes');
 const productRoutes = require('./routes/productRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
 const postRoutes = require('./routes/postRoutes');
+const searchRoutes = require('./routes/searchRoutes');
 
 const app = express();
 
@@ -53,7 +54,7 @@ app.use('/users', userRoutes);
 app.use('/products', productRoutes);
 app.use('/posts', postRoutes)
 app.use('/api', uploadRoutes); // image upload route
-
+app.use('/search',searchRoutes); 
 //  404 Not Found
 app.use(notFound);
 

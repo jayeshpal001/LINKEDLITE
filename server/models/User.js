@@ -1,11 +1,12 @@
 const mongoose = require('mongoose');
-const bcrypt = require('bcrypt'); 
+
 const userSchema = new mongoose.Schema({
     name: {
         type: String, 
         required: [true, "Name is required"], 
         minlength: [3, "Name must be at least 3 characters"], 
-        trim: true   // Remove unwanted space 
+        trim: true,
+        index: true  // Standard index for exact matching
     }, 
     email: {
         type: String, 
@@ -13,34 +14,53 @@ const userSchema = new mongoose.Schema({
         unique: true, 
         trim: true, 
         lowercase: true, 
-        match: [/\S+@\S+\.\S+/, "Invalid email format"]  // regex for email format
+        match: [/\S+@\S+\.\S+/, "Invalid email format"]
     },
-    password:{
+    password: {
         type: String, 
         required: [true, "Password is required"], 
         minlength: [6, "Password must be at least 6 Characters"]
-        
+    },
+    bio: {
+        type: String,
+        trim: true
+    },
+    // New search-optimized fields
+    headline: {
+        type: String,
+        trim: true,
+        maxlength: 120
+    },
+    skills: [{
+        type: String,
+        trim: true,
+        lowercase: true
+    }],
+    location: {
+        type: String,
+        trim: true
     },
     isVerified: {
         type: Boolean, 
         default: false
     },
-    bio: String
-}, {timestamps: true} ); 
+}, { timestamps: true });
 
-// userSchema.pre('save', async function (next) {
-//     // Only hash if password was modified (not during update)
-//     if (!this.isModified("password")) {
-//         return next(); 
-//     }
-//     try {
-//         this.password = await bcrypt.hash(this.password, 10); 
-//         next(); 
-//     } catch (error) {
-//         return next(error); 
-//     }
-// })
+// Compound text index for full-text search (weights determine priority)
+userSchema.index({
+    name: 'text',
+    headline: 'text',
+    bio: 'text',
+    skills: 'text'
+}, {
+    weights: {
+        name: 10,       // Highest priority
+        headline: 5,
+        skills: 3,
+        bio: 1
+    },
+    name: 'user_search_index'
+});
 
-const User = mongoose.model('User', userSchema); 
-
-module.exports = User; 
+const User = mongoose.model('User', userSchema);
+module.exports = User;
