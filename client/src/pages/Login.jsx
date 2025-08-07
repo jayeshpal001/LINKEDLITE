@@ -40,9 +40,6 @@ function Login() {
     e.preventDefault();
     await handleLoginSubmit(formData);
     // Redirect to profile if already has headline/skills
-    if (formData.otp) {
-      navigate('/');
-    }
   };
 
   const handleSendOTP = async (e) => {
