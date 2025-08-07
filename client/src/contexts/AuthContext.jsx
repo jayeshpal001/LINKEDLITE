@@ -1,10 +1,8 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
-
 import axiosInstance from "../api/api";
 import { UIContext } from "./UIContext";
-
 
 export const AuthContext = createContext();
 
@@ -14,29 +12,51 @@ export const AuthProvider = ({ children }) => {
   const [otpSent, setOtpSent] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [serverMsg, setServerMsg] = useState("");
-   const [error, setError] = useState("");
+  const [error, setError] = useState("");
+  const [searchHistory, setSearchHistory] = useState([]);
   const { setHideNav } = useContext(UIContext);
-  
- useEffect(() => {
-  try {
-    const storedUser = localStorage.getItem("user"); 
-    if (storedUser) {
-      setUserData(JSON.parse(storedUser))
+
+  // Initialize user data and search history from localStorage
+  useEffect(() => {
+    try {
+      const storedUser = localStorage.getItem("user");
+      const storedHistory = localStorage.getItem("searchHistory");
+      
+      if (storedUser) {
+        setUserData(JSON.parse(storedUser));
+      }
+      if (storedHistory) {
+        setSearchHistory(JSON.parse(storedHistory));
+      }
+    } catch (e) {
+      console.error("Error parsing localStorage data", e);
+      localStorage.removeItem("user");
+      localStorage.removeItem("searchHistory");
     }
-  } catch (e) {
-    console.error("Error parsing user from localStorage", e);
-    localStorage.removeItem("user");
-  }
-}, []);
+  }, []);
 
-
+  // Persist user data and search history to localStorage
   useEffect(() => {
     if (userData) {
-      localStorage.setItem("user", JSON.stringify(userData)); 
+      localStorage.setItem("user", JSON.stringify(userData));
     }
-  }, [userData])
-  
-  
+    localStorage.setItem("searchHistory", JSON.stringify(searchHistory));
+  }, [userData, searchHistory]);
+
+  // Add to search history
+  const addToSearchHistory = (query) => {
+    if (!query.trim()) return;
+    
+    setSearchHistory(prev => {
+      const newHistory = [query, ...prev.filter(q => q !== query)].slice(0, 5);
+      return newHistory;
+    });
+  };
+
+  // Clear search history
+  const clearSearchHistory = () => {
+    setSearchHistory([]);
+  };
 
   const sendRegisterOtp = async (formData) => {
     setIsLoading(true);
@@ -45,16 +65,19 @@ export const AuthProvider = ({ children }) => {
         name: formData.name,
         email: formData.email,
         password: formData.password,
+        bio: formData.bio, 
+        headline: formData.headline || "", // LinkedIn-like profile field
+        skills: formData.skills || []     // Skills array
       });
-      console.log(res.data);
+      
       setOtpSent(true);
-      alert(res.data.message);
-      setUserData(res.data.user)
+      setUserData(res.data.user);
       setServerMsg("OTP sent to your email.");
-
+      Swal.fire("Success", res.data.message, "success");
     } catch (err) {
       console.error(err.response?.data?.message);
       setServerMsg(err.response?.data?.message || "Failed to send OTP");
+      Swal.fire("Error", err.response?.data?.message || "Registration failed", "error");
     } finally {
       setIsLoading(false);
     }
@@ -64,43 +87,50 @@ export const AuthProvider = ({ children }) => {
     setIsLoading(true);
     try {
       const res = await axiosInstance.post("/users/register/verify-otp", formData);
-      console.log(res.data.user);
       
+      setUserData(res.data.user);
       setServerMsg("Registration successful!");
-       setUserData(res.data.user)
-      alert("Registration Successful");
-      setOtpSent(false); 
-      navigate('/login');
+      setOtpSent(false);
+      
+      // LinkedIn-like onboarding redirect
+      if (!res.data.user.headline || !res.data.user.skills?.length) {
+        navigate('/login');
+      } else {
+        navigate('/');
+      }
+      
+      Swal.fire("Success", "Registration Successful", "success");
     } catch (err) {
       console.error(err.response.data.message);
-      
       setServerMsg(err.response?.data?.message || "OTP verification failed");
+      Swal.fire("Error", err.response?.data?.message || "Verification failed", "error");
     } finally {
       setIsLoading(false);
     }
   };
 
   const sendLoginOtp = async (formData) => {
-  setIsLoading(true);
-  try {
-    const response = await axiosInstance.post('/users/login', {
-     email: formData.email, 
-     password: formData.password,
-    });
-    setOtpSent(true)
-    console.log('Please enter otp: ', response.data.user);
-     setUserData(response.data.user)
-    alert(response.data.message);
-    setError("");
-  } catch (error) {
-    console.error('Login error:', error.response?.data?.message);
-    setError(error.response?.data?.message || 'Invalid email or password');
-  } finally {
-    setIsLoading(false);
-  }
-};
+    setIsLoading(true);
+    try {
+      const response = await axiosInstance.post('/users/login', {
+        email: formData.email, 
+        password: formData.password,
+      });
+      
+      setOtpSent(true);
+      setUserData(response.data.user);
+      setError("");
+      Swal.fire("Success", response.data.message, "success");
+    } catch (error) {
+      console.error('Login error:', error.response?.data?.message);
+      setError(error.response?.data?.message || 'Invalid email or password');
+      Swal.fire("Error", error.response?.data?.message || "Login failed", "error");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-const handleLoginSubmit = async (formData) => {
+  const handleLoginSubmit = async (formData) => {
     setIsLoading(true);
     try {
       const response = await axiosInstance.post("/users/login/verify-otp", {
@@ -108,21 +138,26 @@ const handleLoginSubmit = async (formData) => {
         otp: formData.otp,
       });
 
-      console.log("Login successful:", response.data.user);
-      setUserData(response.data.user)
+      setUserData(response.data.user);
       setHideNav(false);
-      alert(response.data.message);
-      navigate(`/profile/${response.data.user._id}`);
       setError("");
+      
+      // LinkedIn-like post-login redirect
+      if (response.data.user?.headline && response.data.user?.skills?.length) {
+        navigate(`/profile/${response.data.user._id}`);
+      } else {
+        navigate('/profile-setup');
+      }
+      
+      Swal.fire("Success", response.data.message, "success");
     } catch (error) {
       console.error("Login error:", error.response?.data?.message);
       setError(error.response?.data?.message || "Invalid email or otp");
+      Swal.fire("Error", error.response?.data?.message || "Verification failed", "error");
     } finally {
       setIsLoading(false);
     }
   };
-
-  
 
   const logoutUser = async () => {
     const result = await Swal.fire({
@@ -130,17 +165,18 @@ const handleLoginSubmit = async (formData) => {
       text: "You will be logged out from your account.",
       icon: "warning",
       showCancelButton: true,
-      confirmButtonColor: "#3085d6",
+      confirmButtonColor: "#0A66C2", // LinkedIn blue
       cancelButtonColor: "#d33",
       confirmButtonText: "Yes, Logout",
     });
 
     if (result.isConfirmed) {
       try {
-      const res=  await axiosInstance.get("/users/logout");
-        console.log(res.data);
+        await axiosInstance.get("/users/logout");
         setUserData(null);
         localStorage.removeItem("user");
+        setHideNav(true);
+        
         Swal.fire({
           icon: "success",
           title: "Logged out",
@@ -148,7 +184,7 @@ const handleLoginSubmit = async (formData) => {
           timer: 1500,
           showConfirmButton: false,
         });
-        setHideNav(true);
+        
         navigate("/login");
       } catch (err) {
         console.error("Logout failed:", err);
@@ -174,7 +210,10 @@ const handleLoginSubmit = async (formData) => {
         serverMsg,
         error, 
         sendLoginOtp, 
-        handleLoginSubmit
+        handleLoginSubmit,
+        searchHistory,
+        addToSearchHistory,
+        clearSearchHistory
       }}
     >
       {children}

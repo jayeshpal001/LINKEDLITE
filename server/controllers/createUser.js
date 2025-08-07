@@ -7,38 +7,50 @@ const OTPModel = require('../models/OTPModel');
 const bcrypt = require('bcrypt');
 
 const createUser = asyncHandler(async (req, res) => {
-    const { name, email, password } = req.body;
+  const { name, email, password, bio, headline, skills, location } = req.body;
 
-    if (!name || !email || !password) {
-        res.status(400);
-        throw new Error("All fields are required");
-    }
+  if (!name || !email || !password) {
+    res.status(400);
+    throw new Error("Name, email, and password are required");
+  }
 
-    const isExists = await User.findOne({ email });
-    if (isExists) {
-        res.status(409);
-        throw new Error("Email already exist");
-    }
-    const hashPass = await bcrypt.hash(password, 10); 
-    await TempUser.create({name, email, password: hashPass})
+  const isExists = await User.findOne({ email });
+  if (isExists) {
+    res.status(409);
+    throw new Error("Email already exists");
+  }
 
-    const otp = generateOtp(); 
-    const otpExpiry = Date.now()+5*60*1000; 
-    const hashOtp = await bcrypt.hash(otp, 10); 
+  const hashPass = await bcrypt.hash(password, 10);
+  await TempUser.create({
+    name,
+    email,
+    password: hashPass,
+    bio,
+    headline,
+    skills,
+    location
+  });
 
-    await OTPModel.create({ email, otp: hashOtp, otpExpiry });
+  const otp = generateOtp();
+  const otpExpiry = Date.now() + 5 * 60 * 1000;
+  const hashOtp = await bcrypt.hash(otp, 10);
+
+  await OTPModel.create({ email, otp: hashOtp, otpExpiry });
+
+  if (process.env.NODE_ENV !== "production") {
     console.log(`OTP for ${email}: ${otp}`);
+  }
 
-   await sendEmail(
-        email, 
-        "Email verification", 
-        `<h1>Hellow ${name} welcome to backend Your otp is ${otp} </h1>`
-    )
+  await sendEmail(
+    email,
+    "Email Verification",
+    `<h1>Hello ${name}, welcome to our platform. Your OTP is: <strong>${otp}</strong></h1>`
+  );
 
-    res.status(201).json({
-        success: true,
-        message: "Registration successful. Please verify your email",
-    })
-})
+  res.status(201).json({
+    success: true,
+    message: "Registration successful. Please verify your email",
+  });
+});
 
-module.exports = createUser; 
+module.exports = createUser;
