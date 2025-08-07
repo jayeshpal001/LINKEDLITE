@@ -87,6 +87,7 @@ export const AuthProvider = ({ children }) => {
     setIsLoading(true);
     try {
       const res = await axiosInstance.post("/users/register/verify-otp", formData);
+      console.log(res.data);
       
       setUserData(res.data.user);
       setServerMsg("Registration successful!");
@@ -146,7 +147,7 @@ export const AuthProvider = ({ children }) => {
       if (response.data.user?.headline && response.data.user?.skills?.length) {
         navigate(`/profile/${response.data.user._id}`);
       } else {
-        navigate('/profile-setup');
+        navigate(`/profile/${response.data.user._id}`);
       }
       
       Swal.fire("Success", response.data.message, "success");

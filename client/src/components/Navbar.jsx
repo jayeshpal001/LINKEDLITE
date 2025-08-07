@@ -254,7 +254,7 @@ export default function Navbar() {
                           <div>
                             <p className="font-semibold text-gray-900">{userData?.name}</p>
                             <p className="text-xs text-gray-500 truncate max-w-[150px]">
-                              {userData?.headline || "LinkSphere Member"}
+                              {userData?.headline || "LinkedLite Member"}
                             </p>
                           </div>
                         </div>
